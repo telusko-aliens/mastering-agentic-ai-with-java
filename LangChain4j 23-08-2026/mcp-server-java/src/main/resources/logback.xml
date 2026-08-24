@@ -1,0 +1,41 @@
+<configuration>
+
+    <!--
+        This is the Logback configuration file.
+
+        Its main purpose is to control where our application logs go.
+
+        IMPORTANT for MCP STDIO:
+        STDOUT is reserved for MCP JSON-RPC communication.
+        Therefore, application logs MUST go to STDERR.
+    -->
+
+    <!--
+        Create a console logger that writes to System.err
+        instead of System.out.
+    -->
+    <appender name="STDERR"
+              class="ch.qos.logback.core.ConsoleAppender">
+
+        <!-- Send logs to STDERR -->
+        <target>System.err</target>
+
+        <encoder>
+
+            <!-- Print only the log message -->
+            <pattern>%msg%n</pattern>
+
+        </encoder>
+    </appender>
+
+
+    <!--
+        Only show WARN and ERROR level logs.
+
+        Connect the above STDERR logger to the root logger.
+    -->
+    <root level="WARN">
+        <appender-ref ref="STDERR"/>
+    </root>
+
+</configuration>
