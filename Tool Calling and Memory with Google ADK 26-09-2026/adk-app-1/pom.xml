@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.telusko</groupId>
+    <artifactId>adk-app-1</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <properties>
+        <!--
+                    ADK needs Java 17 or later, so 21 and 25 are fine.
+
+                    Use release, not the old source + target pair. Those compile against the new JDK's
+                    libraries while emitting old bytecode, which lets you call a method that does not
+                    exist on 17 and only fail at runtime.
+                 -->
+        <maven.compiler.release>17</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <adk.version>1.9.0</adk.version>
+        <!--
+                    What a bare "mvn exec:java" runs. Override per run:
+                      mvn compile exec:java -Dexec.mainClass=com.telusko.adk.Step2_Instructions
+
+                    This has to be a property. Put <mainClass> inside the plugin's <configuration> and
+                    -Dexec.mainClass is silently ignored, so every command runs the same class.
+                 -->
+        <exec.mainClass>com.telusko.adk.Step1_HelloAgent</exec.mainClass>
+    </properties>
+    <dependencies>
+        <!--
+                    The framework: LlmAgent, Runner, Session, Event, tools, the model classes.
+                    Brings RxJava, Guava and the GenAI SDK with it.
+                 -->
+        <dependency>
+            <groupId>com.google.adk</groupId>
+            <artifactId>google-adk</artifactId>
+            <version>${adk.version}</version>
+        </dependency>
+        <!--
+                    A separate artifact, not a module of the one above. Here for one thing: AdkWebServer,
+                    the local chat UI. It pulls in Spring Boot and Tomcat and you write none of it.
+                    Google says it is not for production, so treat it like a test dependency.
+                 -->
+        <dependency>
+            <groupId>com.google.adk</groupId>
+            <artifactId>google-adk-dev</artifactId>
+            <version>${adk.version}</version>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <!--  Pinned so the same command behaves the same on every machine.  -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <!--  Without this, RxJava threads keep the JVM alive and the command hangs.  -->
+                    <cleanupDaemonThreads>true</cleanupDaemonThreads>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
