@@ -1,0 +1,8 @@
+.claude/
+.idea/
+.mvn/
+target/
+target_test-classes/
+data/
+*.mv.db
+*.trace.db

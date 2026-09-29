@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.telusko</groupId>
+    <artifactId>untitled</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <adk.version>1.9.0</adk.version>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>com.google.adk</groupId>
+            <artifactId>google-adk</artifactId>
+            <version>${adk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.adk</groupId>
+            <artifactId>google-adk-dev</artifactId>
+            <version>${adk.version}</version>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <!--
+                            -parameters keeps the real parameter names in the class file. Java throws them
+                            away by default and the compiler writes arg0, arg1 instead.
+
+                            This is not optional once you use tools. Two things break without it:
+
+                              1. The model is told your argument is called "arg0", so it guesses.
+                              2. ToolContext stops working. ADK hides that parameter from the model by
+                                 ignoring any parameter NAMED toolContext. With the name erased the match
+                                 fails and you get "Unsupported type: com.google.adk.tools.ToolContext".
+
+                            @Schema(name = ...) fixes the first problem but not the second, because the
+                            ignore list is checked against the real parameter name.
+                         -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <compilerArgs>
+                        <arg>-parameters</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <cleanupDaemonThreads>true</cleanupDaemonThreads>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+
+</project>
