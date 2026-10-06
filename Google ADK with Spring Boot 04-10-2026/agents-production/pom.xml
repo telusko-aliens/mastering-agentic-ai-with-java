@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.telusko</groupId>
+    <artifactId>agents-production</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <adk.version>1.9.0</adk.version>
+
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>com.google.adk</groupId>
+            <artifactId>google-adk</artifactId>
+            <version>${adk.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.adk</groupId>
+            <artifactId>google-adk-dev</artifactId>
+            <version>${adk.version}</version>
+        </dependency>
+
+        <!--
+            New in class 4. A2A support is NOT in google-adk: it is a separate artifact, and
+            that is worth knowing before you spend an afternoon searching the main jar for
+            RemoteA2AAgent.
+
+            It brings the a2a-java SDK with it (io.a2a), which is the reference implementation
+            of the protocol. We use its client to talk to a remote agent, and its spec classes
+            to describe one.
+        -->
+        <dependency>
+            <groupId>com.google.adk</groupId>
+            <artifactId>google-adk-a2a</artifactId>
+            <version>${adk.version}</version>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+                Still required. ADK hides a ToolContext parameter from the model by ignoring any
+                parameter NAMED toolContext, and Java erases parameter names without this.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <compilerArgs>
+                        <arg>-parameters</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <cleanupDaemonThreads>true</cleanupDaemonThreads>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+
+</project>
