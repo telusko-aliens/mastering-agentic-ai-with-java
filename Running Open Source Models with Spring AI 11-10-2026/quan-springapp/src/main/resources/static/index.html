@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Quantisation Lab</title>
+    <style>
+        :root {
+          --ink: #1a1f36; --dim: #6b7489; --line: #e3e8ee;
+          --accent: #1d4ed8; --surface: #f5f7fa;
+          --ok: #0e7c3a; --bad: #b42318;
+        }
+        * { box-sizing: border-box; }
+        body {
+          margin: 0 auto; padding: 28px 20px 60px; max-width: 980px;
+          font: 14px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          color: var(--ink); background: #fff;
+        }
+        h1 { font-size: 21px; margin: 0 0 4px; }
+        h2 { font-size: 14px; margin: 30px 0 8px; text-transform: uppercase;
+             letter-spacing: .06em; color: var(--dim); font-weight: 600; }
+        .sub { color: var(--dim); margin: 0 0 20px; }
+        button {
+          padding: 9px 16px; font: inherit; cursor: pointer; border-radius: 6px;
+          border: 1px solid var(--accent); background: var(--accent); color: #fff;
+        }
+        button.ghost { background: #fff; color: var(--ink); border-color: #cfd7df; }
+        button:disabled { opacity: .5; cursor: default; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+        th { text-align: left; font-size: 11px; text-transform: uppercase;
+             letter-spacing: .06em; color: var(--dim); font-weight: 600;
+             padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+        td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+        td.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .mono { font-family: Consolas, monospace; font-size: 12.5px; }
+        .pending { color: var(--dim); }
+        .ok { color: var(--ok); font-weight: 600; }
+        .bad { color: var(--bad); font-weight: 600; }
+        .bar {
+          display: inline-block; height: 9px; border-radius: 2px;
+          background: var(--accent); opacity: .75; vertical-align: middle; margin-right: 7px;
+        }
+        .note { color: var(--dim); font-size: 13px; margin: 6px 0 0; }
+        .verdict {
+          background: #fff8e6; border: 1px solid #f0e0b0; border-radius: 6px;
+          padding: 13px 15px; margin-top: 10px; font-size: 14px;
+        }
+        .q { border-bottom: 1px solid var(--line); padding: 12px 0; }
+        .q .ask { font-weight: 600; margin-bottom: 8px; }
+        .q .hard { font-size: 11px; color: #b45309; margin-left: 7px;
+                   text-transform: uppercase; letter-spacing: .05em; }
+        .q .replies { display: grid; grid-template-columns: 90px 1fr; gap: 4px 12px;
+                      font-size: 13px; }
+        .q .who { color: var(--dim); font-family: Consolas, monospace; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+<h1>Quantisation Lab</h1>
+<p class="sub">
+    One model from huggingface.co, stored three ways. Same questions, same machine,
+    temperature 0. The only variable is bits per number.
+</p>
+
+<button id="run">Run all three</button>
+<button id="reset" class="ghost">Reset</button>
+<p class="note" id="status">The biggest file takes the longest. Expect a minute or two in total.</p>
+
+<h2>Results</h2>
+<table>
+    <thead>
+    <tr>
+        <th style="width:88px">Quant</th>
+        <th style="width:150px">Size on disk</th>
+        <th class="num" style="width:110px">Speed</th>
+        <th class="num" style="width:80px">Total</th>
+        <th class="num" style="width:90px">Recall</th>
+        <th class="num" style="width:80px">Work</th>
+        <th class="num" style="width:95px">Total time</th>
+    </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+</table>
+
+<div id="verdict"></div>
+
+<h2>Answer by answer</h2>
+<p class="note">This is where a quality difference, if there is one, becomes visible.</p>
+<div id="answers"></div>
+
+<script>
+    const rows = document.getElementById('rows')
+    const answersBox = document.getElementById('answers')
+    const verdictBox = document.getElementById('verdict')
+    const status = document.getElementById('status')
+    const runBtn = document.getElementById('run')
+
+    let variants = []
+    let questions = []
+    const results = {}
+
+    Promise.all([
+      fetch('/api/variants').then(r => r.json()),
+      fetch('/api/questions').then(r => r.json()),
+    ]).then(([v, q]) => {
+      variants = v
+      questions = q
+      draw()
+    })
+
+    function draw() {
+      rows.innerHTML = ''
+      const sizes = variants.map(v => results[v.quant]?.sizeGb || 0)
+      const biggest = Math.max(...sizes, 0.01)
+      const fastest = Math.max(...variants.map(v => results[v.quant]?.tokensPerSecond || 0), 0.01)
+
+      for (const v of variants) {
+        const r = results[v.quant]
+        const tr = document.createElement('tr')
+
+        if (!r) {
+          tr.innerHTML =
+            '<td class="mono">' + v.quant + '</td>' +
+            '<td colspan="6" class="pending">not run yet</td>'
+          rows.appendChild(tr)
+          continue
+        }
+
+        // Bars make the ratios obvious without anybody doing division in their head.
+        const sizeBar = Math.round((r.sizeGb / biggest) * 110)
+        const speedBar = Math.round((r.tokensPerSecond / fastest) * 70)
+        const scoreClass = r.correct === r.total ? 'ok' : 'bad'
+
+        tr.innerHTML =
+          '<td class="mono">' + r.quant + '</td>' +
+          '<td><span class="bar" style="width:' + sizeBar + 'px"></span>' + r.sizeGb + ' GB</td>' +
+          '<td class="num"><span class="bar" style="width:' + speedBar + 'px"></span>' +
+            r.tokensPerSecond + ' tok/s</td>' +
+          '<td class="num ' + scoreClass + '">' + r.correct + ' / ' + r.total + '</td>' +
+          '<td class="num">' + (r.correct - r.correctHard) + ' / ' + (r.total - r.totalHard) + '</td>' +
+          '<td class="num">' + r.correctHard + ' / ' + r.totalHard + '</td>' +
+          '<td class="num">' + (r.totalMillis / 1000).toFixed(1) + ' s</td>'
+        rows.appendChild(tr)
+      }
+
+      drawAnswers()
+      drawVerdict()
+    }
+
+    function drawAnswers() {
+      const done = variants.filter(v => results[v.quant])
+      if (!done.length) { answersBox.innerHTML = '<p class="note">Run the benchmark first.</p>'; return }
+
+      answersBox.innerHTML = ''
+      for (const q of questions) {
+        const div = document.createElement('div')
+        div.className = 'q'
+        let html = '<div class="ask">' + escapeHtml(q.prompt) +
+          (q.hard ? '<span class="hard">harder</span>' : '') + '</div><div class="replies">'
+        for (const v of done) {
+          const a = results[v.quant].answers.find(a => a.questionId === q.id)
+          html += '<div class="who">' + v.quant + '</div>' +
+            '<div><span class="' + (a.correct ? 'ok' : 'bad') + '">' +
+            (a.correct ? 'PASS' : 'FAIL') + '</span>  ' + escapeHtml(a.reply) + '</div>'
+        }
+        div.innerHTML = html + '</div>'
+        answersBox.appendChild(div)
+      }
+    }
+
+    // The number the class came for: what did shrinking actually cost.
+    function drawVerdict() {
+      const done = variants.map(v => results[v.quant]).filter(Boolean)
+      if (done.length < variants.length) { verdictBox.innerHTML = ''; return }
+
+      const small = done.reduce((a, b) => (a.sizeGb <= b.sizeGb ? a : b))
+      const big = done.reduce((a, b) => (a.sizeGb >= b.sizeGb ? a : b))
+
+      const smaller = (big.sizeGb / small.sizeGb).toFixed(1)
+      const faster = (small.tokensPerSecond / big.tokensPerSecond).toFixed(1)
+      const workGap = big.correctHard - small.correctHard
+      const totalGap = big.correct - small.correct
+
+      // Size and speed are measurements. Score, over fifteen questions, is not precise
+      // enough to call a small gap a difference, so the wording does not pretend it is.
+      let quality
+      if (workGap === 0 && totalGap <= 0) {
+        quality = 'and on this quiz it got no fewer answers right.'
+      } else if (workGap === 0) {
+        quality = 'identical on the reasoning questions, ' + Math.abs(totalGap) +
+          ' apart on recall, which fifteen questions cannot tell from luck.'
+      } else {
+        quality = big.quant + ' got ' + workGap + ' more reasoning question' +
+          (workGap > 1 ? 's' : '') + ' right, out of ' + big.totalHard + '.'
+      }
+
+      verdictBox.innerHTML =
+        '<div class="verdict">' +
+        '<b>' + small.quant + ' against ' + big.quant + ':</b> ' +
+        smaller + ' times smaller on disk, ' + faster + ' times faster to write, ' +
+        quality +
+        '<div class="note" style="margin-top:8px">Size and speed are measured and ' +
+        'repeatable. The score is fifteen questions on one small model: treat a gap of ' +
+        'one or two as noise, not as a finding.</div>' +
+        '</div>'
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div')
+      d.textContent = s
+      return d.innerHTML
+    }
+
+    runBtn.onclick = async () => {
+      runBtn.disabled = true
+      for (const v of variants) {
+        status.textContent = 'Running ' + v.quant + '...'
+        try {
+          results[v.quant] = await (await fetch('/api/run/' + v.quant, { method: 'POST' })).json()
+        } catch (e) {
+          status.textContent = v.quant + ' failed: ' + e.message
+        }
+        draw()
+      }
+      status.textContent = 'Done. All three ran the same six questions at temperature 0.'
+      runBtn.disabled = false
+    }
+
+    document.getElementById('reset').onclick = () => {
+      for (const k of Object.keys(results)) delete results[k]
+      status.textContent = 'Cleared.'
+      draw()
+    }
+</script>
+
+</body>
+</html>

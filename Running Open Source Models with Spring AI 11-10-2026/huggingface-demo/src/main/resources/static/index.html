@@ -1,0 +1,777 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+
+    <!--
+        Character encoding and responsive page settings.
+    -->
+
+    <meta charset="utf-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1">
+
+    <title>Hugging Face Chat</title>
+
+
+    <!-- =====================================================
+         CSS STYLING
+         =====================================================
+
+         This section controls the appearance
+         of our chatbot interface.
+
+         It does not communicate with the AI model.
+
+         It only controls layout, colors,
+         buttons, messages, and spacing.
+    -->
+
+    <style>
+
+        /*
+          CSS variables used throughout the page.
+        */
+
+        :root {
+          --ink: #1a1f36;
+          --dim: #6b7489;
+          --line: #e3e8ee;
+          --accent: #1d4ed8;
+          --surface: #f5f7fa;
+        }
+
+        * {
+          box-sizing: border-box;
+        }
+
+        /*
+          Main page styling.
+        */
+
+        body {
+          margin: 0 auto;
+          padding: 28px 20px 40px;
+          max-width: 720px;
+
+          font: 15px/1.6 -apple-system,
+                BlinkMacSystemFont,
+                'Segoe UI',
+                Roboto,
+                sans-serif;
+
+          color: var(--ink);
+          background: #fff;
+        }
+
+        h1 {
+          font-size: 20px;
+          margin: 0 0 4px;
+        }
+
+        /*
+          Displays information about the
+          currently configured AI model.
+        */
+
+        .badge {
+          display: inline-block;
+          padding: 3px 10px;
+          border-radius: 20px;
+          background: var(--surface);
+          border: 1px solid var(--line);
+          font-size: 12.5px;
+          color: var(--dim);
+          margin-bottom: 18px;
+        }
+
+        /*
+          Chat conversation area.
+        */
+
+        #thread {
+          min-height: 240px;
+          margin-bottom: 16px;
+        }
+
+        /*
+          Individual chat message.
+        */
+
+        .msg {
+          padding: 12px 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        /*
+          Message sender:
+          You or Model.
+        */
+
+        .msg .who {
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: .06em;
+          color: var(--dim);
+          margin-bottom: 4px;
+        }
+
+        .msg .text {
+          white-space: pre-wrap;
+        }
+
+        .empty {
+          color: var(--dim);
+          padding: 28px 0;
+        }
+
+        /*
+          Input field and buttons.
+        */
+
+        .row {
+          display: flex;
+          gap: 8px;
+        }
+
+        input {
+          flex: 1;
+          padding: 10px 12px;
+          font: inherit;
+          border: 1px solid #cfd7df;
+          border-radius: 6px;
+        }
+
+        input:focus {
+          outline: none;
+          border-color: var(--accent);
+        }
+
+        button {
+          padding: 10px 16px;
+          font: inherit;
+          cursor: pointer;
+          border-radius: 6px;
+          border: 1px solid var(--accent);
+          background: var(--accent);
+          color: #fff;
+        }
+
+        button.ghost {
+          background: #fff;
+          color: var(--ink);
+          border-color: #cfd7df;
+        }
+
+        button:disabled {
+          opacity: .5;
+          cursor: default;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+     PAGE HEADING
+     ===================================================== -->
+
+<h1>Hugging Face Chat</h1>
+
+
+<!--
+    MODEL INFORMATION
+
+    This element initially displays:
+
+    loading...
+
+    JavaScript calls:
+
+    GET /api/model
+
+    The returned model information
+    is displayed here.
+-->
+
+<div class="badge" id="model">
+    loading...
+</div>
+
+
+
+<!-- =====================================================
+     CHAT MESSAGES
+     ===================================================== -->
+
+<!--
+    This div displays the conversation.
+
+    Initially it displays:
+
+    Ask something.
+
+    After sending messages,
+    JavaScript adds user and AI messages here.
+-->
+
+<div id="thread">
+
+    <div class="empty">
+        Ask something.
+    </div>
+
+</div>
+
+
+
+<!-- =====================================================
+     USER INPUT
+     ===================================================== -->
+
+<div class="row">
+
+    <!--
+        User types the question here.
+    -->
+
+    <input
+            id="q"
+            placeholder="Ask about Java or Spring..."
+            autofocus>
+
+
+    <!--
+        Sends the message to our Spring Boot API.
+    -->
+
+    <button id="send">
+        Send
+    </button>
+
+
+    <!--
+        Clears the conversation history.
+    -->
+
+    <button id="clear" class="ghost">
+        Clear
+    </button>
+
+</div>
+
+
+
+<!-- =====================================================
+     JAVASCRIPT
+     =====================================================
+
+     JavaScript communicates with Spring Boot.
+
+     It calls three REST endpoints:
+
+     GET    /api/model
+     POST   /api/chat
+     DELETE /api/chat
+
+     The browser does not communicate directly
+     with Hugging Face or Ollama.
+
+     It communicates with our Spring Boot backend.
+
+     Spring AI handles the AI integration.
+-->
+
+<script>
+
+
+    // ======================================================
+    // STEP 1: GET HTML ELEMENTS
+    // ======================================================
+
+    /*
+      document.getElementById():
+
+      Finds HTML elements using their IDs.
+
+      We need references to:
+
+      - Chat messages area
+      - User input field
+      - Send button
+      - Clear button
+    */
+
+    const thread = document.getElementById('thread')
+
+    const input = document.getElementById('q')
+
+    const sendBtn = document.getElementById('send')
+
+    const clearBtn = document.getElementById('clear')
+
+
+    /*
+      empty tracks whether the chat area
+      contains any conversation messages.
+
+      Initially there are no messages.
+    */
+
+    let empty = true
+
+
+
+    // ======================================================
+    // STEP 2: GET ACTIVE MODEL INFORMATION
+    // ======================================================
+
+    /*
+      When the page loads, we call:
+
+      GET /api/model
+
+      The Spring Boot backend returns JSON.
+
+      Example:
+
+      {
+        "model": "hf.co/...",
+        "runningOn": "this machine",
+        "costPerMessage": "nothing"
+      }
+
+      We display this information
+      at the top of the chatbot.
+    */
+
+    fetch('/api/model')
+
+      /*
+        Convert the HTTP response into JSON.
+      */
+
+      .then(r => r.json())
+
+      /*
+        Read the JSON properties
+        and display the model information.
+      */
+
+      .then(d => {
+
+        document.getElementById('model').textContent =
+
+          d.model +
+          '  ·  runs on ' +
+          d.runningOn +
+          '  ·  costs ' +
+          d.costPerMessage
+
+      })
+
+      /*
+        If the backend is unavailable,
+        display an error message.
+      */
+
+      .catch(() => {
+
+        document.getElementById('model').textContent =
+          'backend not reachable'
+
+      })
+
+
+
+    // ======================================================
+    // STEP 3: DISPLAY A CHAT MESSAGE
+    // ======================================================
+
+    /*
+      add(who, text)
+
+      Adds a message to the chat interface.
+
+      Parameters:
+
+      who:
+      Indicates the sender.
+
+      Example:
+      You
+      Model
+
+      text:
+      Contains the actual message.
+
+      Example:
+
+      add('You', 'What is Java?')
+
+      add('Model', 'Java is a programming language.')
+    */
+
+    function add(who, text) {
+
+
+      /*
+        If this is the first message,
+        remove the initial placeholder:
+
+        Ask something.
+      */
+
+      if (empty) {
+
+        thread.innerHTML = ''
+
+        empty = false
+
+      }
+
+
+      /*
+        Create a new HTML div.
+      */
+
+      const div = document.createElement('div')
+
+
+      /*
+        Apply the CSS class used
+        for chat messages.
+      */
+
+      div.className = 'msg'
+
+
+      /*
+        Create two sections:
+
+        1. Sender name
+        2. Message text
+      */
+
+      div.innerHTML =
+        '<div class="who"></div><div class="text"></div>'
+
+
+      /*
+        Display who sent the message.
+      */
+
+      div.querySelector('.who').textContent = who
+
+
+      /*
+        Display the message content.
+
+        textContent treats the response as text,
+        not as executable HTML.
+      */
+
+      div.querySelector('.text').textContent = text
+
+
+      /*
+        Add the message to the conversation area.
+      */
+
+      thread.appendChild(div)
+
+
+      /*
+        Scroll to the latest message.
+      */
+
+      div.scrollIntoView({
+        behavior: 'smooth',
+        block: 'end'
+      })
+
+
+      /*
+        Return the newly created message element.
+
+        This allows us to update its text later.
+      */
+
+      return div
+
+    }
+
+
+
+    // ======================================================
+    // STEP 4: SEND MESSAGE TO SPRING BOOT
+    // ======================================================
+
+    /*
+      This function runs when the user
+      clicks Send or presses Enter.
+
+      FLOW:
+
+      1. Read user message.
+
+      2. Display the user message.
+
+      3. Show "thinking...".
+
+      4. Call POST /api/chat.
+
+      5. Spring Boot calls the AI model.
+
+      6. Receive AI response.
+
+      7. Display AI response.
+    */
+
+    async function send() {
+
+
+      /*
+        Read the user message.
+
+        trim() removes unnecessary
+        spaces from the beginning and end.
+      */
+
+      const message = input.value.trim()
+
+
+      /*
+        Do nothing if the message is empty.
+      */
+
+      if (!message) return
+
+
+      /*
+        Clear the input field.
+      */
+
+      input.value = ''
+
+
+      /*
+        Disable Send while waiting for a response.
+
+        This prevents repeated clicks
+        during the current request.
+      */
+
+      sendBtn.disabled = true
+
+
+      /*
+        Display the user's message.
+      */
+
+      add('You', message)
+
+
+      /*
+        Display a temporary AI message.
+
+        Initially:
+
+        Model: thinking...
+      */
+
+      const pending = add('Model', 'thinking...')
+
+
+      try {
+
+
+        /*
+          Send an HTTP POST request.
+
+          Endpoint:
+
+          POST /api/chat
+
+          Request body:
+
+          The user's message as plain text.
+
+          Example:
+
+          What is Spring Boot?
+
+          Notice:
+
+          We are not calling Hugging Face directly.
+
+          We are calling our Spring Boot API.
+        */
+
+        const reply = await fetch('/api/chat', {
+
+          method: 'POST',
+
+          body: message
+
+        })
+
+
+        /*
+          Read the response text.
+
+          Replace "thinking..." with
+          the response returned by Spring Boot.
+        */
+
+        pending.querySelector('.text').textContent =
+          await reply.text()
+
+
+      } catch (e) {
+
+
+        /*
+          If the HTTP request fails,
+          display the error message.
+        */
+
+        pending.querySelector('.text').textContent =
+          'Request failed: ' + e.message
+
+
+      } finally {
+
+
+        /*
+          This block executes after
+          the request finishes or fails.
+
+          Enable the Send button again.
+        */
+
+        sendBtn.disabled = false
+
+
+        /*
+          Put the cursor back into
+          the input field.
+        */
+
+        input.focus()
+
+      }
+
+    }
+
+
+
+    // ======================================================
+    // STEP 5: SEND BUTTON CLICK
+    // ======================================================
+
+    /*
+      When the user clicks Send,
+      execute the send() function.
+    */
+
+    sendBtn.onclick = send
+
+
+
+    // ======================================================
+    // STEP 6: PRESS ENTER TO SEND
+    // ======================================================
+
+    /*
+      Allow the user to send messages
+      by pressing Enter.
+    */
+
+    input.onkeydown = (e) => {
+
+      if (e.key === 'Enter') {
+
+        send()
+
+      }
+
+    }
+
+
+
+    // ======================================================
+    // STEP 7: CLEAR CONVERSATION
+    // ======================================================
+
+    /*
+      When the user clicks Clear:
+
+      1. Call DELETE /api/chat.
+
+      2. Spring Boot clears ChatMemory.
+
+      3. Remove displayed messages.
+
+      4. Reset the chat interface.
+
+      5. Start a new conversation.
+    */
+
+    clearBtn.onclick = async () => {
+
+
+      /*
+        Call Spring Boot's DELETE endpoint.
+
+        Backend method:
+
+        reset()
+
+        This executes:
+
+        memory.clear(CONVERSATION)
+      */
+
+      await fetch('/api/chat', {
+
+        method: 'DELETE'
+
+      })
+
+
+      /*
+        Clear the visible conversation.
+      */
+
+      thread.innerHTML =
+        '<div class="empty">Ask something.</div>'
+
+
+      /*
+        Mark the conversation as empty.
+      */
+
+      empty = true
+
+
+      /*
+        Focus the input field.
+      */
+
+      input.focus()
+
+    }
+
+
+</script>
+
+</body>
+
+</html>

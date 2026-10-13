@@ -1,0 +1,14 @@
+target/
+bin/
+data/
+node_modules/
+dist/
+.settings/
+.classpath
+.project
+.idea/
+*.iml
+.env
+
+# Instructor-only teaching notes
+NovaCart-Capstone.docx
