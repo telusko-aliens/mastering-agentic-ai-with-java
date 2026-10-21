@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spring AI 2.0</title>
+  <style>
+    :root {
+      --ink: #1a1f36; --dim: #6b7489; --line: #e3e8ee;
+      --accent: #1d4ed8; --surface: #f5f7fa;
+      --old: #b45309; --new: #0e7c3a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0 auto; padding: 28px 20px 60px; max-width: 900px;
+      font: 14px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--ink); background: #fff;
+    }
+    h1 { font-size: 21px; margin: 0 0 4px; }
+    .sub { color: var(--dim); margin: 0 0 24px; }
+    .card { border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; margin-bottom: 14px; }
+    .card h2 { font-size: 15px; margin: 0 0 4px; }
+    .card .what { color: var(--dim); font-size: 13px; margin: 0 0 12px; }
+    .diff { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .diff div { border-radius: 6px; padding: 9px 11px; font: 12px/1.5 Consolas, monospace; white-space: pre-wrap; }
+    .diff .was { background: #fff7ed; border: 1px solid #fed7aa; }
+    .diff .now { background: #f0fdf4; border: 1px solid #bbf7d0; }
+    .diff .tag { display: block; font-family: inherit; font-size: 10.5px; text-transform: uppercase;
+                 letter-spacing: .06em; margin-bottom: 5px; font-weight: 600; }
+    .was .tag { color: var(--old); }
+    .now .tag { color: var(--new); }
+    button { padding: 7px 14px; font: inherit; cursor: pointer; border-radius: 6px;
+             border: 1px solid var(--accent); background: var(--accent); color: #fff; font-size: 13px; }
+    button:disabled { opacity: .5; cursor: default; }
+    pre { background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+          padding: 11px 13px; margin: 11px 0 0; white-space: pre-wrap;
+          font: 12px/1.6 Consolas, monospace; min-height: 20px; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    input { flex: 1; padding: 7px 10px; font: inherit; font-size: 13px;
+            border: 1px solid #cfd7df; border-radius: 6px; }
+  </style>
+</head>
+<body>
+
+<h1>Spring AI 2.0</h1>
+<p class="sub">
+  Spring Boot 4.1.1 &middot; Spring AI 2.0.1 &middot; Java 17.
+  Each card is one thing that changed since the 1.1.8 we used in class.
+</p>
+
+<!-- ------------------------------------------------------------------ 1 -->
+<div class="card">
+  <h2>1. Tool calling still works through ChatClient</h2>
+  <p class="what">The loop moved into a ToolCallingAdvisor, which ChatClient registers for you.
+    From here nothing looks different.</p>
+  <div class="diff">
+    <div class="was"><span class="tag">1.1.8</span>.functions("seatsLeft")</div>
+    <div class="now"><span class="tag">2.0</span>.tools(courseTools)</div>
+  </div>
+  <button data-get="/api/tools">Ask: seats left on spring-ai?</button>
+  <pre data-out></pre>
+</div>
+
+<!-- ------------------------------------------------------------------ 2 -->
+<div class="card">
+  <h2>2. ChatModel no longer runs the loop</h2>
+  <p class="what">Same question, same tools, but called straight on ChatModel.
+    In class this returned a finished answer. Now it stops at the tool request.</p>
+  <div class="diff">
+    <div class="was"><span class="tag">1.1.8</span>model.call(prompt)
+  -> "12 seats left"</div>
+    <div class="now"><span class="tag">2.0</span>model.call(prompt)
+  -> text: ""
+     toolCalls: [seatsLeft]</div>
+  </div>
+  <button data-get="/api/raw">Run the same question on ChatModel</button>
+  <pre data-out></pre>
+</div>
+
+<!-- ------------------------------------------------------------------ 3 -->
+<div class="card">
+  <h2>3. Memory needs a conversation id</h2>
+  <p class="what">Send two messages. The second one proves it remembered.
+    Remove the id in the code and this throws instead of falling back.</p>
+  <div class="diff">
+    <div class="was"><span class="tag">1.1.8</span>optional.
+Missing id fell into
+DEFAULT_CONVERSATION_ID</div>
+    <div class="now"><span class="tag">2.0</span>.advisors(a -&gt; a.param(
+    ChatMemory.CONVERSATION_ID,
+    "class"))</div>
+  </div>
+  <div class="row">
+    <input data-chat value="My name is Shramik and I teach Google ADK.">
+    <button data-post="/api/chat">Send</button>
+    <button data-del="/api/chat" style="background:#fff;color:var(--ink);border-color:#cfd7df">Clear</button>
+  </div>
+  <pre data-out></pre>
+</div>
+
+<!-- ------------------------------------------------------------------ 4 -->
+<div class="card">
+  <h2>4. Options are immutable, and passed as a builder</h2>
+  <p class="what">The request spec now takes the builder, not a finished object.
+    copy() is gone; use mutate().</p>
+  <div class="diff">
+    <div class="was"><span class="tag">1.1.8</span>.options(OpenAiChatOptions
+    .builder()
+    .temperature(0.0)
+    .build())</div>
+    <div class="now"><span class="tag">2.0</span>.options(OpenAiChatOptions
+    .builder()
+    .temperature(0.0))</div>
+  </div>
+  <button data-get="/api/options">Ask with temperature 0</button>
+  <pre data-out></pre>
+</div>
+
+<!-- ------------------------------------------------------------------ 5 -->
+<div class="card">
+  <h2>5. A plain question, unchanged</h2>
+  <p class="what">The everyday API you learned is still the everyday API.
+    Run this so the class sees that most code does not move.</p>
+  <button data-get="/api/ask">Ask: what is Spring Boot?</button>
+  <pre data-out></pre>
+</div>
+
+<script>
+  function outOf(button) {
+    return button.closest('.card').querySelector('[data-out]')
+  }
+
+  async function run(button, work) {
+    const out = outOf(button)
+    button.disabled = true
+    out.textContent = 'working...'
+    try {
+      out.textContent = await work()
+    } catch (e) {
+      out.textContent = 'failed: ' + e.message
+    } finally {
+      button.disabled = false
+    }
+  }
+
+  for (const b of document.querySelectorAll('[data-get]')) {
+    b.onclick = () => run(b, async () => {
+      const r = await fetch(b.dataset.get)
+      const text = await r.text()
+      try { return JSON.stringify(JSON.parse(text), null, 2) } catch { return text }
+    })
+  }
+
+  for (const b of document.querySelectorAll('[data-post]')) {
+    b.onclick = () => run(b, async () => {
+      const input = b.closest('.card').querySelector('[data-chat]')
+      const sent = input.value
+      const r = await fetch(b.dataset.post, { method: 'POST', body: sent })
+      const reply = await r.text()
+      // After the first message, offer the question that proves memory works.
+      input.value = 'What is my name and which module do I teach?'
+      return 'You:   ' + sent + '\n\nModel: ' + reply
+    })
+  }
+
+  for (const b of document.querySelectorAll('[data-del]')) {
+    b.onclick = () => run(b, async () => {
+      await fetch(b.dataset.del, { method: 'DELETE' })
+      b.closest('.card').querySelector('[data-chat]').value =
+        'My name is Shramik and I teach Google ADK.'
+      return 'Conversation cleared. Ask the name again and it will not know.'
+    })
+  }
+</script>
+
+</body>
+</html>

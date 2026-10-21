@@ -1,0 +1,84 @@
+spring:
+  application:
+    name: rag-eval-langsmith
+
+  # --------------------------------------------------------------------------
+  # Postgres. Started for us by spring-boot-docker-compose from
+  # docker-compose.yml, which also supplies the url, username and password.
+  # These values are only the fallback for running against your own Postgres.
+  # --------------------------------------------------------------------------
+  datasource:
+    url: jdbc:postgresql://localhost:5433/ragdb
+    username: raguser
+    password: ragpass
+
+  docker:
+    compose:
+      enabled: true
+      lifecycle-management: start_and_stop
+
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      # Note the property names: in Spring AI 2.0 the ".options." segment was
+      # dropped. On 1.x this was spring.ai.openai.chat.options.model.
+      chat:
+        model: gpt-4.1-mini
+        temperature: 0.0          # 2.0 applies no default, so set it explicitly
+      embedding:
+        model: text-embedding-3-small
+
+    vectorstore:
+      pgvector:
+        initialize-schema: true   # creates the table and the HNSW index on startup
+        table-name: refund_docs
+        dimensions: 1536          # must match text-embedding-3-small
+        distance-type: cosine-distance
+        index-type: hnsw
+
+    # Put the prompt and the answer on the span, so a LangSmith trace shows what
+    # was actually asked and answered rather than just a duration.
+    chat:
+      observations:
+        log-prompt: true
+        log-completion: true
+      client:
+        observations:
+          log-input: true
+
+# ----------------------------------------------------------------------------
+# Tracing. Every span is sampled because this is a teaching app; in production
+# you would sample a fraction.
+#
+# The OTLP endpoint and headers are NOT set here. They are set in
+# TracingConfig from LANGSMITH_API_KEY, so the key never appears in a file
+# that gets committed.
+# ----------------------------------------------------------------------------
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+
+  # Traces go to LangSmith. Metrics have nowhere to go, so switch them off.
+  #
+  # spring-boot-starter-opentelemetry also brings micrometer-registry-otlp, which
+  # auto-configures itself and tries to push metrics to http://localhost:4318 every
+  # minute. Nothing is listening there, so the log fills with:
+  #
+  #   Failed to publish metrics to OTLP receiver
+  #   java.net.ConnectException: Connection refused
+  #
+  # It is harmless and it is not a tracing problem, but it buries the output in a
+  # class. Point it at a collector if you have one; otherwise turn it off.
+  otlp:
+    metrics:
+      export:
+        enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+logging:
+  level:
+    com.telusko.ragevallab: INFO

@@ -1,0 +1,35 @@
+# ============================================================================
+# FILE: docker-compose.yml
+# TEACH ORDER: Step 3 of 15
+#
+# WHAT THIS FILE IS:
+#   Describes the database we need: Postgres with the pgvector extension.
+#   pgvector = Postgres that can store VECTORS (lists of numbers) and find
+#   the vectors that are "closest" to a given one. That is how RAG finds
+#   the chunks that match a question.
+#
+# YOU DO NOT RUN THIS BY HAND.
+#   spring-boot-docker-compose is in pom.xml, so "mvn spring-boot:run"
+#   (or Run in IntelliJ) starts this container automatically and also
+#   tells Spring the database URL, username and password.
+#   Only requirement: Docker Desktop must be running.
+# ============================================================================
+
+services:
+  pgvector:
+    # A ready-made image: Postgres 17 with pgvector already installed.
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: ragdb            # database name
+      POSTGRES_USER: raguser        # login user
+      POSTGRES_PASSWORD: ragpass    # login password (fine for a class, not for production)
+    ports:
+      # "outside:inside". Inside the container Postgres uses 5432.
+      # On your laptop we use o5433, so a Postgres you already have on 5432 is not disturbed.
+      - "5433:5432"
+    healthcheck:
+      # Spring waits until this command says "ready" before connecting.
+      test: ["CMD-SHELL", "pg_isready -U raguser -d ragdb"]
+      interval: 5s     # check every 5 seconds
+      timeout: 3s      # each check may take up to 3 seconds
+      retries: 20      # give up after 20 failed checks

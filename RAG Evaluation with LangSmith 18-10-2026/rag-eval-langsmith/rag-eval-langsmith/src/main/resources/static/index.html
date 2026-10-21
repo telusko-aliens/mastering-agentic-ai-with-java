@@ -1,0 +1,197 @@
+<!doctype html>
+<!--
+============================================================================
+FILE: index.html
+TEACH ORDER: Step 15 of 15  (optional - only if students ask about the UI)
+
+WHAT THIS FILE IS:
+  The web page you see at http://localhost:8080. Spring Boot serves any
+  file in src/main/resources/static automatically, so no controller is needed.
+
+STRUCTURE:
+  <header>  title + 4 tab buttons
+  <main>    4 <section> panels, only ONE visible at a time:
+              #documents   -> ingest + show the policy
+              #chat        -> ask questions, see answer + chunks
+              #tracing     -> is tracing on, what the spans mean
+              #evaluation  -> run the 12-question test, compare topK
+  app.js    does all the clicking logic and calls the REST APIs
+  style.css makes it look nice
+
+IDs (like id="ingest") are how app.js finds each element.
+============================================================================
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- Makes the page scale properly on phones. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAG Evaluation Lab</title>
+  <!-- The little tab icon, drawn inline as SVG, so there is no extra file
+       and no "favicon not found" error in the browser console. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232d6cdf'/%3E%3Cpath d='M9 21V11h3.2l3 6 3-6H21v10h-2.6v-5.6L16 21h-.6l-2.8-5.6V21z' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>RAG Evaluation Lab</h1>
+  <p>One document, a RAG pipeline over it, traced to LangSmith and scored against a dataset.</p>
+  <!-- The 4 tabs. data-tab="..." holds the id of the panel each tab opens.
+       class="on" marks the tab that is active when the page loads. -->
+  <nav>
+    <button data-tab="documents" class="on">Documents</button>
+    <button data-tab="chat">RAG Chat</button>
+    <button data-tab="tracing">Tracing</button>
+    <button data-tab="evaluation">Evaluation</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ============================================================ documents
+       TAB 1: Ingest the document. Calls POST /api/rag/ingest
+       and GET /api/rag/documents + /api/rag/health. -->
+  <section class="panel on" id="documents">
+    <h2>Ingestion</h2>
+    <p class="note">
+      Read the file, split it into chunks, embed each chunk, store the vectors in pgvector.
+      Ingesting twice does nothing unless you force it, and forcing it replaces rather than
+      appends.
+    </p>
+    <div class="row">
+      <!-- Ingest = force=false, Force re-ingest = force=true -->
+      <button class="go" id="ingest">Ingest</button>
+      <button class="go ghost" id="reingest">Force re-ingest</button>
+      <!-- Shows "ready" (green) or "not ingested" (orange). -->
+      <span id="ingestStatus" class="badge">checking...</span>
+    </div>
+    <!-- The JSON result of the ingest call is printed here. -->
+    <pre id="ingestResult">Not run yet.</pre>
+
+    <h2>The document</h2>
+    <!-- "refund-policy.txt · 9 chunks stored" -->
+    <p class="note" id="docMeta"></p>
+    <!-- The full text of the policy. The ONLY thing the AI knows about. -->
+    <pre class="doc" id="docText">loading...</pre>
+  </section>
+
+  <!-- ================================================================= chat
+       TAB 2: Ask a question. Calls POST /api/rag/ask. -->
+  <section class="panel" id="chat">
+    <h2>Ask the document</h2>
+    <p class="note">
+      Answers come only from the retrieved chunks. A question the document does not cover
+      is refused rather than guessed.
+    </p>
+    <div class="row">
+      <!-- The question box, pre-filled with an example. -->
+      <input id="question" value="How many days do I have to return a large appliance?">
+      <!-- How many chunks to retrieve. 3 is the default. -->
+      <select id="topK">
+        <option value="2">topK 2</option>
+        <option value="3" selected>topK 3</option>
+        <option value="5">topK 5</option>
+      </select>
+      <button class="go" id="ask">Ask</button>
+    </div>
+    <!-- Three ready-made questions. Clicking one fills the box and asks it.
+         The third (CEO) is NOT in the document, so it should be refused. -->
+    <div class="row" style="flex-wrap:wrap">
+      <button class="go ghost sample">What is the return window for a large appliance?</button>
+      <button class="go ghost sample">I paid with loyalty points. How am I refunded?</button>
+      <button class="go ghost sample">Who is the CEO of NovaCart?</button>
+    </div>
+
+    <h2>Answer</h2>
+    <pre id="answer">Ask something.</pre>
+    <!-- "refused · topK 3 · 3 chunks · 1520 ms · gpt-4.1-mini · sources: ..." -->
+    <p class="note" id="answerMeta"></p>
+
+    <h2>Retrieved chunks</h2>
+    <p class="note">These are the chunks the answer was built from, in rank order.</p>
+    <!-- Each chunk is shown as a collapsible <details> box (filled by app.js).
+         This is the EVIDENCE - the big difference between RAG and a plain chatbot. -->
+    <div id="chunks"><p class="note">Nothing yet.</p></div>
+  </section>
+
+  <!-- ============================================================== tracing
+       TAB 3: Tracing status. Calls GET /api/tracing/status. -->
+  <section class="panel" id="tracing">
+    <h2>Status</h2>
+    <div class="row">
+      <!-- "tracing on · java-rag-evaluation-demo" (green) or "tracing off" (orange) -->
+      <span id="traceBadge" class="badge">checking...</span>
+      <!-- Opens smith.langchain.com in a new tab. href is set by app.js. -->
+      <a id="traceLink" class="go ghost" style="text-decoration:none" target="_blank"
+         rel="noreferrer">Open LangSmith</a>
+    </div>
+    <p class="note" id="traceNote"></p>
+
+    <h2>What each span covers</h2>
+    <p class="note">
+      Spring AI traces the model call by itself. The retrieval around it is not traced
+      automatically, so those spans are created in the application. In a RAG system the
+      retrieval is usually what went wrong, and a trace without it shows a slow answer
+      and no reason.
+    </p>
+    <!-- The list of span names + what they mean, filled by app.js. -->
+    <div id="spans"></div>
+
+    <h2>How to read a trace in LangSmith</h2>
+    <!-- Fixed help text: a mini guide to reading a trace. -->
+    <pre>1. smith.langchain.com, then the project java-rag-evaluation-demo
+2. Open the newest trace. Every question is one trace.
+3. The tree is:
+
+     POST /api/rag/ask
+       rag.retrieval      how many chunks came back, for which question
+       rag.generation     the model call
+         chat gpt-4.1-mini    tokens and timing, added by Spring AI
+
+4. Click rag.retrieval and read documents_retrieved. If it is 0, the answer
+   was a refusal and no model was called at all.
+5. A slow trace with a fast rag.generation means retrieval was the problem,
+   not the model.</pre>
+  </section>
+
+  <!-- =========================================================== evaluation
+       TAB 4: Run the 12-question test. Calls /api/evaluation/run,
+       /api/evaluation/compare and /api/evaluation/results. -->
+  <section class="panel" id="evaluation">
+    <h2>Run the dataset</h2>
+    <p class="note">
+      Twelve questions, ten answerable from the document and two not. Every question goes
+      through the real pipeline. Expect about a minute per run.
+    </p>
+    <div class="row">
+      <select id="evalTopK">
+        <option value="2">topK 2</option>
+        <option value="3" selected>topK 3</option>
+        <option value="5">topK 5</option>
+      </select>
+      <button class="go" id="runEval">Run</button>
+      <button class="go ghost" id="compare">Compare topK 2 and 5</button>
+      <!-- "running 3...", "done", or an error. -->
+      <span id="evalStatus" class="note"></span>
+    </div>
+    <!-- NEW: links to the same runs in LangSmith's experiment dashboard
+         (filled by loadLangSmithLinks() in app.js). -->
+    <p class="note" id="langsmithLinks"></p>
+
+    <!-- The 4 summary cards (Passed, Correctness, Faithfulness, Avg latency). -->
+    <div id="summary"></div>
+    <!-- The topK 2 vs topK 5 table, only after "Compare". -->
+    <div id="comparison"></div>
+
+    <h2>Every case</h2>
+    <!-- One row per question with PASS/FAIL and all scores. -->
+    <div id="caseTable"><p class="note">Nothing yet.</p></div>
+  </section>
+
+</main>
+
+<!-- Loaded LAST, so all the elements above already exist when the script runs. -->
+<script src="app.js"></script>
+</body>
+</html>

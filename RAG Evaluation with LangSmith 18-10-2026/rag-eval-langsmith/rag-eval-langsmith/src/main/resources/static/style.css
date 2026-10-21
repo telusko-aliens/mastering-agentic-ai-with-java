@@ -1,0 +1,215 @@
+/*
+ * ============================================================================
+ * FILE: style.css
+ * TEACH ORDER: Step 15 of 15  (optional - no need to explain in detail)
+ *
+ * WHAT THIS FILE DOES:
+ *   Only the LOOK of the page. Plain CSS, no framework. Nothing here affects
+ *   RAG, tracing or evaluation. Simple, dense design because every screen is
+ *   numbers and tables someone is reading.
+ *
+ * KEY IDEAS IF SOMEONE ASKS:
+ *   :root { --name: value }  -> CSS variables (colours used everywhere)
+ *   .panel / .panel.on       -> how the tabs work: only the "on" panel shows
+ *   .pass / .fail            -> green PASS, red FAIL in the results table
+ *   .badge.ok / .badge.off   -> green / orange status badges
+ * ============================================================================
+ */
+
+/* Colour palette and fonts, as variables. Use them with var(--name). */
+:root {
+  --ink: #1a1f36;      /* main text colour (dark navy) */
+  --dim: #6b7489;      /* grey for secondary text */
+  --line: #e3e8ee;     /* light border lines */
+  --surface: #f5f7fa;  /* light grey background for boxes */
+  --accent: #1d4ed8;   /* blue for buttons and active tab */
+  --ok: #0e7c3a;       /* green = PASS / ready */
+  --bad: #b42318;      /* red = FAIL / refused */
+  --warn: #b45309;     /* orange = off / not ingested */
+  --mono: Consolas, 'SF Mono', monospace;  /* code-style font */
+}
+
+/* Width includes padding + border. Makes sizing predictable. */
+* { box-sizing: border-box; }
+
+/* Base font and colours for the whole page. */
+body {
+  margin: 0;
+  font: 14px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--ink);
+  background: #fff;
+}
+
+/* Top bar with title and tabs. */
+header {
+  border-bottom: 1px solid var(--line);
+  padding: 18px 24px 0;
+}
+
+header h1 { font-size: 19px; margin: 0 0 2px; }
+header p { color: var(--dim); margin: 0 0 14px; font-size: 13px; }
+
+/* ------------------------------------------------------------------ tabs */
+
+/* Tabs sit in a row. */
+nav { display: flex; gap: 2px; }
+
+nav button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  padding: 9px 16px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--dim);
+  cursor: pointer;
+}
+
+nav button:hover { color: var(--ink); }
+
+/* The active tab: blue text with a blue underline. */
+nav button.on {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+main { padding: 22px 24px 60px; max-width: 1060px; }
+
+/* THE TAB TRICK: every panel is hidden... */
+.panel { display: none; }
+.panel.on { display: block; }   /* ...except the one with class "on" (set by app.js). */
+
+/* ------------------------------------------------------------------ bits */
+
+/* Small grey uppercase section headings. */
+h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--dim);
+  margin: 24px 0 8px;
+  font-weight: 600;
+}
+
+h2:first-child { margin-top: 0; }
+
+p.note { color: var(--dim); font-size: 13px; margin: 0 0 12px; }
+
+/* Main blue button. */
+button.go {
+  padding: 8px 16px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+button.go.ghost { background: #fff; color: var(--ink); border-color: #cfd7df; }
+button.go:disabled { opacity: .5; cursor: default; }
+
+/* Text box and dropdowns. */
+input, select, textarea {
+  padding: 8px 11px;
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid #cfd7df;
+  border-radius: 6px;
+  color: inherit;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.row input { flex: 1; }
+
+/* Boxes for JSON, answers and chunk text. pre-wrap keeps line breaks but wraps long lines. */
+pre {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 0;
+  white-space: pre-wrap;
+  font: 12.5px/1.6 var(--mono);
+  overflow-x: auto;
+}
+
+pre.doc { max-height: 420px; overflow-y: auto; }
+
+table { width: 100%; border-collapse: collapse; }
+
+th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--dim);
+  font-weight: 600;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.mono, .mono { font-family: var(--mono); font-size: 12.5px; }
+
+.pass { color: var(--ok); font-weight: 600; }
+.fail { color: var(--bad); font-weight: 600; }
+.muted { color: var(--dim); }
+
+/* Small rounded status pills: "ready", "tracing on" etc. */
+.badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--dim);
+}
+
+.badge.ok { color: var(--ok); border-color: #bbf7d0; background: #f0fdf4; }
+.badge.off { color: var(--warn); border-color: #fed7aa; background: #fff7ed; }
+
+.cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 11px 13px;
+}
+
+.card .label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--dim); }
+.card .value { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+details { border: 1px solid var(--line); border-radius: 6px; padding: 9px 12px; margin-bottom: 7px; }
+details summary { cursor: pointer; font-size: 13px; }
+details pre { margin-top: 9px; }
+
+/* One row in the Tracing tab's span list: name | description. */
+.stage {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 8px 14px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.stage .name { font-family: var(--mono); font-size: 12.5px; color: var(--accent); }
+.stage .tags { color: var(--dim); font-size: 12px; }

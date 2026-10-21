@@ -1,0 +1,102 @@
+{
+  "name": "novacart-refund-policy-v1",
+  "description": "Twelve questions about the NovaCart refund policy. Ten are answerable from the document; the last two are not, and a correct system refuses them.",
+  "cases": [
+    {
+      "id": "return-window-standard",
+      "category": "simple-lookup",
+      "question": "How many days do I have to return a normal item?",
+      "expectedAnswer": "30 days from the date the courier marks the parcel as delivered.",
+      "relevantSource": "Most items may be returned within 30 days of delivery. The 30 days are counted from the date the courier marks the parcel as delivered.",
+      "answerable": true
+    },
+    {
+      "id": "return-window-appliance",
+      "category": "simple-lookup",
+      "question": "What is the return window for a large appliance?",
+      "expectedAnswer": "15 days, because of the cost of collection.",
+      "relevantSource": "Large appliances and furniture have a 15 day return window, because of the cost of collection.",
+      "answerable": true
+    },
+    {
+      "id": "return-window-plus-appliance",
+      "category": "multi-hop",
+      "question": "I am a NovaCart Plus member. How long do I have to return a large appliance?",
+      "expectedAnswer": "30 days. A large appliance has a 15 day window and Plus adds 15 days.",
+      "relevantSource": "NovaCart Plus members get an extra 15 days on top of whatever window applies to the item. A Plus member therefore has 45 days on an ordinary item and 30 days on a large appliance.",
+      "answerable": true
+    },
+    {
+      "id": "refund-card-timeline",
+      "category": "simple-lookup",
+      "question": "How long does a refund to a credit card take to appear?",
+      "expectedAnswer": "5 to 7 business days after the refund is issued.",
+      "relevantSource": "Debit or credit card: 5 to 7 business days",
+      "answerable": true
+    },
+    {
+      "id": "cannot-return-list",
+      "category": "list-retrieval",
+      "question": "Can I return swimwear?",
+      "expectedAnswer": "No. Swimwear is final sale and cannot be returned except for a manufacturing fault.",
+      "relevantSource": "The following are final sale and cannot be returned or exchanged under any circumstances except a manufacturing fault: Innerwear, swimwear and pierced jewellery",
+      "answerable": true
+    },
+    {
+      "id": "delivery-fee-change-of-mind",
+      "category": "conditional",
+      "question": "If I change my mind, do I get the delivery fee back?",
+      "expectedAnswer": "No. The delivery fee is refunded only when the return is NovaCart's fault: faulty, wrong or damaged.",
+      "relevantSource": "The original delivery fee is refunded only when the return is caused by NovaCart: a faulty item, a wrong item, or a damaged parcel. For a change of mind, the delivery fee is not refunded.",
+      "answerable": true
+    },
+    {
+      "id": "pickup-fee",
+      "category": "conditional",
+      "question": "Is there a pickup fee if I change my mind about a 300 rupee item?",
+      "expectedAnswer": "Yes, 49 rupees is deducted from the refund, because the item is under 500 rupees and it is a change of mind.",
+      "relevantSource": "For a change of mind on an item under 500 rupees, a pickup fee of 49 rupees is deducted from the refund.",
+      "answerable": true
+    },
+    {
+      "id": "damaged-parcel-deadline",
+      "category": "simple-lookup",
+      "question": "How quickly must I report a damaged parcel?",
+      "expectedAnswer": "Within 48 hours of delivery, with photographs of the packaging and the item.",
+      "relevantSource": "Report a damaged parcel within 48 hours of delivery, with photographs of the packaging and the item.",
+      "answerable": true
+    },
+    {
+      "id": "loyalty-points-refund",
+      "category": "edge-case",
+      "question": "I paid with loyalty points. How am I refunded?",
+      "expectedAnswer": "In loyalty points, not cash, and the points keep their original expiry date.",
+      "relevantSource": "Items bought with loyalty points are refunded in loyalty points, not cash. Points returned this way keep their original expiry date.",
+      "answerable": true
+    },
+    {
+      "id": "international-return",
+      "category": "edge-case",
+      "question": "I ordered from outside India. Who pays return shipping if the item is faulty?",
+      "expectedAnswer": "The customer pays return shipping in all cases on international orders, including faulty items.",
+      "relevantSource": "Orders shipped outside India have a 21 day return window and the customer pays return shipping in all cases, including faulty items.",
+      "answerable": true
+    },
+    {
+      "id": "unanswerable-warranty-length",
+      "category": "unanswerable",
+      "question": "How long is the manufacturer warranty on a NovaCart laptop?",
+      "expectedAnswer": "I don't know based on the available documents.",
+      "relevantSource": "",
+      "answerable": false
+    },
+    {
+      "id": "unanswerable-ceo",
+      "category": "unanswerable",
+      "question": "Who is the CEO of NovaCart and what is the company's annual revenue?",
+      "expectedAnswer": "I don't know based on the available documents.",
+      "relevantSource": "",
+      "answerable": false
+    }
+  ]
+}

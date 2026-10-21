@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Decision Models</title>
+  <!-- All UI styles are kept in this file for a zero-build live demo. -->
+  <style>
+    :root {
+      --ink: #1a1f36; --dim: #6b7489; --line: #e3e8ee;
+      --accent: #1d4ed8; --surface: #f5f7fa;
+      --bar: #2563eb; --bar-dim: #cbd5e1;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0 auto; padding: 28px 20px 60px; max-width: 940px;
+      font: 14px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--ink); background: #fff;
+    }
+    h1 { font-size: 21px; margin: 0 0 4px; }
+    h2 { font-size: 13px; margin: 28px 0 8px; text-transform: uppercase;
+         letter-spacing: .06em; color: var(--dim); font-weight: 600; }
+    .sub { color: var(--dim); margin: 0 0 20px; }
+    textarea {
+      width: 100%; min-height: 72px; padding: 10px 12px; font: inherit; font-size: 13px;
+      border: 1px solid #cfd7df; border-radius: 6px; resize: vertical;
+    }
+    .row { display: flex; gap: 8px; margin: 10px 0 0; flex-wrap: wrap; }
+    button { padding: 8px 16px; font: inherit; font-size: 13px; cursor: pointer;
+             border-radius: 6px; border: 1px solid var(--accent);
+             background: var(--accent); color: #fff; }
+    button.ghost { background: #fff; color: var(--ink); border-color: #cfd7df; }
+    button:disabled { opacity: .5; cursor: default; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 6px; }
+    .panel { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+    .panel h3 { font-size: 13px; margin: 0 0 2px; }
+    .panel .meta { color: var(--dim); font: 11.5px Consolas, monospace; margin-bottom: 12px; }
+    .q { margin-bottom: 14px; }
+    .q .label { font-size: 12px; color: var(--dim); margin-bottom: 3px; }
+    .q .val { font-size: 15px; font-weight: 600; }
+    .q .val small { font-weight: 400; color: var(--dim); font-size: 12px; }
+    .bars { margin-top: 6px; }
+    .bar { display: grid; grid-template-columns: 110px 1fr 44px; gap: 8px;
+           align-items: center; font-size: 12px; margin-bottom: 3px; }
+    /* Both need to be block, or a span ignores width and height and every bar
+       renders as an empty track. */
+    .bar .track { display: block; height: 8px; background: #eef1f5;
+                  border-radius: 3px; overflow: hidden; }
+    .bar .fill { display: block; height: 100%; min-width: 2px;
+                 background: var(--bar); border-radius: 3px; }
+    .bar .pct { text-align: right; font-variant-numeric: tabular-nums; color: var(--dim); }
+    pre { background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+          padding: 11px 13px; white-space: pre-wrap; margin: 0;
+          font: 12.5px/1.6 Consolas, monospace; }
+    .note { color: var(--dim); font-size: 12.5px; margin-top: 10px; }
+    .empty { color: var(--dim); font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<h1>Decision Models</h1>
+<p class="sub">
+  A support ticket arrives. Three things have to be decided about it.
+  The left panel asks a decision model; the right asks a chat model the same thing.
+</p>
+
+<!-- The user enters a support ticket here; preset buttons replace its value. -->
+<textarea id="text">Help! My payouts have been failing for 3 days and nobody answers my emails. I have customers waiting and I am seriously considering cancelling.</textarea>
+
+<div class="row">
+  <button id="run">Ask both</button>
+  <button class="ghost" data-sample="My payouts have been failing for 3 days and nobody answers. I am considering cancelling.">Angry</button>
+  <button class="ghost" data-sample="Hi, quick question: where do I find my invoices in the dashboard? No rush.">Calm</button>
+  <button class="ghost" data-sample="The API returns 500 on every POST to /orders since this morning. Our checkout is down.">Technical</button>
+</div>
+
+<h2>Side by side</h2>
+<div class="two">
+  <div class="panel">
+    <h3>Decision model</h3>
+    <div class="meta" id="dmeta">not run yet</div>
+    <div id="decision"><p class="empty">Press "Ask both".</p></div>
+  </div>
+  <div class="panel">
+    <h3>Chat model</h3>
+    <div class="meta" id="cmeta">not run yet</div>
+    <pre id="chatout">Press "Ask both".</pre>
+    <p class="note">
+      Text. Your code still has to read it, and nothing here says how sure the model was.
+    </p>
+  </div>
+</div>
+
+<script>
+  // Tiny helper to retrieve DOM elements by id.
+  const $ = (id) => document.getElementById(id)
+
+  for (const b of document.querySelectorAll('[data-sample]')) {
+    b.onclick = () => { $('text').value = b.dataset.sample }
+  }
+
+  // Draw each option as a percentage bar from the API probabilities.
+  function bars(entries) {
+    return '<div class="bars">' + entries.map(([label, p]) =>
+      '<div class="bar">' +
+      '<span>' + label + '</span>' +
+      '<span class="track"><span class="fill" style="width:' + Math.round(p * 100) + '%"></span></span>' +
+      '<span class="pct">' + Math.round(p * 100) + '%</span>' +
+      '</div>').join('') + '</div>'
+  }
+
+  // Convert the typed JSON fields returned by /api/triage into the left panel.
+  function renderDecision(d) {
+    const f = d.frustration
+    // The scale answer is a weighted mean, so it can land between two levels.
+    const nearest = f.levels[Math.round(f.mean)]
+
+    return (
+      '<div class="q">' +
+        '<div class="label">Needs attention today?</div>' +
+        '<div class="val">' + (d.urgent.answer ? 'Yes' : 'No') +
+          ' <small>probability ' + d.urgent.probability + '</small></div>' +
+      '</div>' +
+
+      '<div class="q">' +
+        '<div class="label">Which team</div>' +
+        '<div class="val">' + d.team.answer +
+          ' <small>margin ' + d.team.margin + '</small></div>' +
+        bars(Object.entries(d.team.probabilities)) +
+      '</div>' +
+
+      '<div class="q">' +
+        '<div class="label">How frustrated</div>' +
+        '<div class="val">' + nearest +
+          ' <small>mean ' + f.mean + ' of ' + (f.levels.length - 1) + '</small></div>' +
+        bars(f.levels.map((l, i) => [l, f.probabilities[i]])) +
+      '</div>'
+    )
+  }
+
+  // Ask both models through the Spring Boot /api/compare endpoint.
+  // encodeURIComponent safely encodes the ticket as a query parameter for this demo.
+  // In production use POST rather than sending customer text in a URL.
+  $('run').onclick = async () => {
+    const button = $('run')
+    button.disabled = true
+    $('dmeta').textContent = $('cmeta').textContent = 'thinking...'
+    $('decision').innerHTML = '<p class="empty">thinking...</p>'
+    $('chatout').textContent = 'thinking...'
+
+    try {
+      const d = await (await fetch('/api/compare?text=' +
+        encodeURIComponent($('text').value))).json()
+
+      $('dmeta').textContent = d.decisionModel.model + '  ·  ' + d.decisionModel.seconds + ' s'
+      $('decision').innerHTML = renderDecision(d.decisionModel)
+
+      $('cmeta').textContent = d.chatModel.model + '  ·  ' + d.chatModel.seconds + ' s'
+      $('chatout').textContent = d.chatModel.answer
+    } catch (e) {
+      $('decision').innerHTML = '<p class="empty">failed: ' + e.message + '</p>'
+      $('chatout').textContent = 'failed: ' + e.message
+    } finally {
+      button.disabled = false
+    }
+  }
+</script>
+
+</body>
+</html>
